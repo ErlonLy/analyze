@@ -1,4 +1,3 @@
-# core/scanner.py
 import os
 
 def list_all_files(folder_path):

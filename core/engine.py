@@ -1,4 +1,3 @@
-# core/engine.py
 import os
 import json
 from core.scanner import list_all_files
@@ -9,7 +8,7 @@ from core.lua_bridge import run_lua_heuristics
 
 def analyze_folder(folder_path):
     files = list_all_files(folder_path)
-    exe_files = [f for f in files if f.endswith((".exe", ".dll"))]
+    exe_files = [f for f in files if f.lower().endswith((".exe", ".dll"))]
 
     result = {
         "game_path": folder_path,
@@ -20,11 +19,10 @@ def analyze_folder(folder_path):
         "lua_heuristics": []
     }
 
-    result["languages_detected"] = detect_languages(exe_files)
+    result["languages_detected"] = detect_languages(files)
     result["protections"] = detect_protection(exe_files)
     result["crypto_signals"] = detect_crypto(files)
-    # Convertendo a tabela Lua para lista Python:
     heuristics = run_lua_heuristics(files)
-    result["lua_heuristics"] = list(heuristics)  # <--- aqui!
+    result["lua_heuristics"] = list(heuristics) if heuristics else []
 
     return json.dumps(result, indent=2)

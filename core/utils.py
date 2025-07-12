@@ -1,4 +1,3 @@
-# core/utils.py
 def read_file_strings(file_path, limit=2048):
     try:
         with open(file_path, 'rb') as f:

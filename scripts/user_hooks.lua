@@ -1,8 +1,7 @@
 -- scripts/user_hooks.lua
--- Pode ser estendido para novos heurísticos Lua
 function custom_heuristic(file)
-    if string.match(file, "%.pak$") then
-        return "Possível Unreal Engine PAK"
+    if string.match(file, "%.dll$") and string.match(file:lower(), "guard") then
+        return "Possível DLL relacionada a proteção ou anti-cheat"
     end
     return nil
 end
