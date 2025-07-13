@@ -1,5 +1,14 @@
 import yara
 import os
+import sys
+
+def resource_path(relative_path):
+    """
+    Retorna o caminho absoluto para uso com PyInstaller.
+    """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 OBFUSCATION_KEYWORDS = [
     ("renomear_variaveis", ["obfuscat", "rename", "var_", "sym_"]),
@@ -30,9 +39,10 @@ EXTRA_TOOLS = [
 
 def detect_protection(files):
     protections = set()
-    # YARA: Themida, VMProtect
+    # Tenta carregar regras YARA de forma robusta
     try:
-        rules = yara.compile(filepath="yara_rules/themida.yara")
+        rules_path = resource_path("yara_rules/themida.yara")
+        rules = yara.compile(filepath=rules_path)
         for f in files:
             try:
                 matches = rules.match(f)
@@ -42,6 +52,7 @@ def detect_protection(files):
                 continue
     except Exception:
         protections.add("Erro ao carregar regras YARA")
+
     # Busca heurística em nomes e strings
     for path in files:
         base = os.path.basename(path).lower()
