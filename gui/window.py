@@ -6,8 +6,12 @@ from PyQt5.QtWidgets import (
     QMessageBox, QTabWidget, QLabel
 )
 from core.engine import analyze_folder
+from core.update import download_new_version, do_update
+import threading
+import os
 
-GITHUB_VERSION_URL = "https://raw.githubusercontent.com/SEU_USER/SEU_REPO/main/latest_version.json"  # troque pelo seu link
+
+GITHUB_VERSION_URL = "https://raw.githubusercontent.com/ErlonLy/analyze/main/latest_version.json"  # troque pelo seu link
 
 def get_local_version():
     try:
@@ -93,21 +97,55 @@ class MainWindow(QWidget):
                 QMessageBox.warning(self, "Erro", f"Não foi possível salvar: {e}")
 
     def check_update(self):
+        import requests
+        self.lbl_update.setText("Verificando atualização...")
         try:
-            self.lbl_update.setText("Verificando atualização...")
             resp = requests.get(GITHUB_VERSION_URL, timeout=10)
             if resp.status_code == 200:
                 latest = resp.json()
                 local = get_local_version()
                 if latest["version"] > local:
-                    msg = f"<b>Nova versão disponível:</b> {latest['version']}<br><a href='{latest['url']}'>Clique aqui para baixar</a>"
+                    msg = f"<b>Nova versão disponível:</b> {latest['version']}<br><a href='{latest['url']}'>Clique para baixar e atualizar</a>"
+                    self.lbl_update.setText(msg)
+                    # Adiciona botão para atualizar
+                    self.btn_update.setText("Baixar e atualizar")
+                    self.btn_update.clicked.disconnect()
+                    self.btn_update.clicked.connect(lambda: self.start_update(latest["url"], latest["version"]))
                 else:
-                    msg = "Você já está na versão mais recente."
-                self.lbl_update.setText(msg)
+                    self.lbl_update.setText("Você já está na versão mais recente.")
             else:
                 self.lbl_update.setText("Não foi possível acessar o servidor.")
         except Exception as e:
             self.lbl_update.setText(f"Erro ao verificar atualização: {e}")
+
+    def start_update(self, url, version):
+        self.lbl_update.setText(f"Baixando versão {version}...")
+        tmp_path = os.path.join(os.path.dirname(sys.executable), f"update_{version}.exe")
+        def update_progress(done, total):
+            pct = int((done/total)*100)
+            self.lbl_update.setText(f"Baixando atualização: {pct}%")
+        def run_download():
+            err = download_new_version(url, tmp_path, progress_callback=update_progress)
+            if err is True:
+                # Fecha app, faz update e reinicia
+                self.lbl_update.setText("Atualização baixada, atualizando...")
+                try:
+                    # Precisa usar um script auxiliar, porque o Windows bloqueia sobreposição do .exe em uso
+                    with open("update_helper.bat", "w") as f:
+                        f.write(f"""
+    @echo off
+    ping 127.0.0.1 -n 2 > nul
+    move /Y "{tmp_path}" "{sys.executable}"
+    start "" "{sys.executable}"
+    del "%~f0"
+                        """)
+                    os.startfile("update_helper.bat")
+                    QApplication.quit()
+                except Exception as e:
+                    self.lbl_update.setText(f"Erro ao aplicar update: {e}")
+            else:
+                self.lbl_update.setText(f"Erro ao baixar: {err}")
+        threading.Thread(target=run_download, daemon=True).start()
 
 def start_gui():
     app = QApplication(sys.argv)
