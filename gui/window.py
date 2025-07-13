@@ -1,20 +1,22 @@
 import sys
 import os
 import json
-import requests
-import threading
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QTextEdit, QMessageBox, QTabWidget, QLabel, QProgressBar
 )
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, Qt
+from PyQt5.QtGui import QIcon, QPixmap
 from core.engine import analyze_folder
-from core.update import download_new_version, run_batch_update
 
-GITHUB_VERSION_URL = "https://raw.githubusercontent.com/ErlonLy/analyze/main/latest_version.json"  # Troque para o seu!
+def resource_path(relative_path):
+    """Garante que PyInstaller encontra arquivos de dados"""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 def get_local_version():
     try:
-        with open("version.txt") as f:
+        with open(resource_path("version.txt")) as f:
             return f.read().strip()
     except Exception:
         return "0.0.0"
@@ -37,7 +39,7 @@ class AnalyzeWorker(QThread):
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("GameAnalyzer")
+        self.setWindowTitle("Loki Analyzer")
         self.resize(800, 600)
         self.tabs = QTabWidget()
 
@@ -61,16 +63,31 @@ class MainWindow(QWidget):
         self.layout_main.addWidget(self.result_area)
         self.tab_main.setLayout(self.layout_main)
 
-        # Aba Sobre
+        # Aba Sobre (centralizado, com ícone)
         self.tab_about = QWidget()
         self.layout_about = QVBoxLayout()
-        self.lbl_author = QLabel(f"Autor: <b>Lyrien</b><br>Versão atual: <b>{get_local_version()}</b>")
-        self.btn_update = QPushButton("Verificar atualização")
-        self.lbl_update = QLabel("")
-        self.btn_update.clicked.connect(self.check_update)
+
+        # Ícone no topo
+        self.logo = QLabel()
+        pixmap = QPixmap(resource_path("icon.ico"))
+        if not pixmap.isNull():
+            self.logo.setPixmap(pixmap.scaledToWidth(64, Qt.SmoothTransformation))
+        self.logo.setAlignment(Qt.AlignCenter)
+        self.layout_about.addWidget(self.logo)
+
+        self.lbl_author = QLabel(f"""
+            <div style='text-align:center; margin-top:18px;'>
+                <span style='font-size:15pt;'><b>Autor:</b> Lyrien</span><br>
+                <span style='font-size:13pt;'><b>Versão atual:</b> {get_local_version()}</span><br><br>
+                <span style='color:#f5b042; font-style:italic; font-size:11.5pt;'>
+                    Esta ferramenta é para análise superficial de games e programas.<br>
+                    Não me responsabilizo por seu uso.
+                </span><br><br>
+                <span style='color:#aaaaaa; font-size:10pt;'>Copyright (c) 2025 Lyrien</span>
+            </div>
+        """)
+        self.lbl_author.setWordWrap(True)
         self.layout_about.addWidget(self.lbl_author)
-        self.layout_about.addWidget(self.btn_update)
-        self.layout_about.addWidget(self.lbl_update)
         self.layout_about.addStretch()
         self.tab_about.setLayout(self.layout_about)
 
@@ -136,46 +153,6 @@ class MainWindow(QWidget):
                 QMessageBox.information(self, "Sucesso", "Arquivo salvo com sucesso!")
             except Exception as e:
                 QMessageBox.warning(self, "Erro", f"Não foi possível salvar: {e}")
-
-    def check_update(self):
-        self.lbl_update.setText("Verificando atualização...")
-        def verif():
-            try:
-                resp = requests.get(GITHUB_VERSION_URL, timeout=10)
-                if resp.status_code == 200:
-                    latest = resp.json()
-                    local = get_local_version()
-                    if latest["version"] > local:
-                        msg = f"<b>Nova versão disponível:</b> {latest['version']}<br>"
-                        msg += f"<small>Atual:</small> {local}<br>"
-                        self.lbl_update.setText(msg + "Baixando e atualizando...")
-                        self.btn_update.setEnabled(False)
-                        self.do_update(latest["url"], latest["version"])
-                    else:
-                        self.lbl_update.setText("Você já está na versão mais recente.")
-                else:
-                    self.lbl_update.setText("Não foi possível acessar o servidor.")
-            except Exception as e:
-                self.lbl_update.setText(f"Erro ao verificar atualização: {e}")
-        threading.Thread(target=verif, daemon=True).start()
-
-    def do_update(self, url, version):
-        tmp_path = os.path.join(os.path.dirname(sys.executable), f"update_{version}.exe")
-        def progress(done, total):
-            pct = int((done/total)*100)
-            self.lbl_update.setText(f"Baixando atualização: {pct}%")
-        def finish():
-            self.lbl_update.setText("Atualização baixada! Fechando para atualizar...")
-            run_batch_update(tmp_path)
-            QApplication.quit()
-        def download_and_update():
-            res = download_new_version(url, tmp_path, progress_callback=progress)
-            if res is True:
-                finish()
-            else:
-                self.lbl_update.setText(f"Erro ao baixar: {res}")
-                self.btn_update.setEnabled(True)
-        threading.Thread(target=download_and_update, daemon=True).start()
 
 def set_dark_theme(app):
     dark_qss = """
@@ -246,6 +223,8 @@ def set_dark_theme(app):
 def start_gui():
     app = QApplication(sys.argv)
     set_dark_theme(app)
+    app.setWindowIcon(QIcon(resource_path("ico.ico")))
     window = MainWindow()
+    window.setWindowIcon(QIcon(resource_path("ico.ico")))
     window.show()
     sys.exit(app.exec_())
