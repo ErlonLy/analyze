@@ -3,7 +3,6 @@ import os
 
 lua = LuaRuntime(unpack_returned_tuples=True)
 
-# Função heurística principal
 lua.execute("""
 function analyze_files(files)
     local results = {}
@@ -25,7 +24,7 @@ lua_func = lua.globals().analyze_files
 def pylist_to_luatable(pylist):
     tbl = lua.table()
     for i, v in enumerate(pylist):
-        tbl[i+1] = v  # Lua é 1-based!
+        tbl[i+1] = v
     return tbl
 
 def load_user_lua_hooks():
@@ -41,8 +40,7 @@ def load_user_lua_hooks():
 
 def run_lua_heuristics(file_list):
     lua_files = pylist_to_luatable(file_list)
-    results = list(lua_func(lua_files))
-    # Executa scripts customizados do usuário:
+    results = [str(x) for x in lua_func(lua_files) if x]
     for code in load_user_lua_hooks():
         try:
             lua.execute(code)
@@ -53,4 +51,4 @@ def run_lua_heuristics(file_list):
                         results.append(str(custom))
         except Exception:
             continue
-    return results
+    return sorted(set(results))

@@ -2,3 +2,5 @@ pyqt5
 lupa
 pefile
 yara-python
+requests
+pyinstaller
