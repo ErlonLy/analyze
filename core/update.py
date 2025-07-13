@@ -1,7 +1,6 @@
 import requests
 import os
 import sys
-import shutil
 
 def download_new_version(url, dest_path, progress_callback=None):
     try:
@@ -20,18 +19,15 @@ def download_new_version(url, dest_path, progress_callback=None):
     except Exception as e:
         return str(e)
 
-def do_update(new_exe_path):
+def run_batch_update(update_exe_path):
     current_exe = sys.executable
-    backup_path = current_exe + ".bak"
-    try:
-        # Renomeia o .exe atual para backup
-        os.rename(current_exe, backup_path)
-        # Copia novo .exe no lugar do antigo
-        shutil.copy2(new_exe_path, current_exe)
-        # Remove o arquivo baixado
-        os.remove(new_exe_path)
-        # (Opcional) Remove o backup antigo
-        # os.remove(backup_path)
-        return True
-    except Exception as e:
-        return str(e)
+    batch_path = os.path.join(os.path.dirname(current_exe), "update_helper.bat")
+    # Batch para esperar, mover update, relançar, deletar-se
+    with open(batch_path, "w") as f:
+        f.write(f"""@echo off
+timeout /t 2 > nul
+move /y "{update_exe_path}" "{current_exe}"
+start "" "{current_exe}"
+del "%~f0"
+""")
+    os.startfile(batch_path)
