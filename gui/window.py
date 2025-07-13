@@ -4,12 +4,13 @@ import json
 import requests
 import threading
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QTextEdit, QMessageBox, QTabWidget, QLabel
+    QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QTextEdit, QMessageBox, QTabWidget, QLabel, QProgressBar
 )
+from PyQt5.QtCore import QThread, pyqtSignal
 from core.engine import analyze_folder
 from core.update import download_new_version, run_batch_update
 
-GITHUB_VERSION_URL = "https://raw.githubusercontent.com/ErlonLy/analyze/main/latest_version.json"  # Troque para o seu repositório!
+GITHUB_VERSION_URL = "https://raw.githubusercontent.com/ErlonLy/analyze/main/latest_version.json"  # Troque para o seu!
 
 def get_local_version():
     try:
@@ -17,6 +18,21 @@ def get_local_version():
             return f.read().strip()
     except Exception:
         return "0.0.0"
+
+class AnalyzeWorker(QThread):
+    progress_changed = pyqtSignal(int)
+    finished = pyqtSignal(str)
+
+    def __init__(self, folder):
+        super().__init__()
+        self.folder = folder
+
+    def run(self):
+        result = analyze_folder(self.folder, progress_callback=self.update_progress)
+        self.finished.emit(result)
+
+    def update_progress(self, value):
+        self.progress_changed.emit(value)
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -28,6 +44,11 @@ class MainWindow(QWidget):
         # Aba Principal
         self.tab_main = QWidget()
         self.layout_main = QVBoxLayout()
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(False)
+        self.layout_main.addWidget(self.progress_bar)
+
         self.result_area = QTextEdit()
         self.result_area.setReadOnly(True)
         self.btn_select = QPushButton("Selecionar pasta do jogo")
@@ -85,10 +106,19 @@ class MainWindow(QWidget):
     def select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Selecione a pasta do jogo")
         if folder:
-            result = analyze_folder(folder)
-            self.last_json = result
-            self.result_area.setHtml(self.pretty_result(result))  # <-- Troca para setHtml aqui!
-            self.btn_export.setEnabled(True)
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setValue(0)
+            self.result_area.clear()
+            self.btn_export.setEnabled(False)
+            self.worker = AnalyzeWorker(folder)
+            self.worker.progress_changed.connect(self.progress_bar.setValue)
+            def on_finished(result):
+                self.last_json = result
+                self.result_area.setHtml(self.pretty_result(result))
+                self.progress_bar.setVisible(False)
+                self.btn_export.setEnabled(True)
+            self.worker.finished.connect(on_finished)
+            self.worker.start()
 
     def export_result(self):
         options = QFileDialog.Options()
@@ -99,7 +129,6 @@ class MainWindow(QWidget):
                     with open(file, "w", encoding="utf-8") as f:
                         f.write(self.last_json)
                 else:
-                    # Exporta sem HTML se for TXT
                     import re
                     plain = re.sub(r'<[^>]+>', '', self.result_area.toHtml())
                     with open(file, "w", encoding="utf-8") as f:
@@ -181,6 +210,17 @@ def set_dark_theme(app):
         border: 1px solid #3a3d41;
         border-radius: 6px;
         font-size: 11pt;
+    }
+    QProgressBar {
+        border: 1px solid #444;
+        border-radius: 7px;
+        background: #35383c;
+        text-align: center;
+    }
+    QProgressBar::chunk {
+        background-color: #f5b042;
+        width: 10px;
+        margin: 0.5px;
     }
     QPushButton {
         background-color: #31363b;
