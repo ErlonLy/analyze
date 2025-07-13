@@ -3,9 +3,6 @@ import os
 import sys
 
 def resource_path(relative_path):
-    """
-    Retorna o caminho absoluto para uso com PyInstaller.
-    """
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
@@ -39,33 +36,39 @@ EXTRA_TOOLS = [
 
 def detect_protection(files):
     protections = set()
-    # Tenta carregar regras YARA de forma robusta
+    prot_map = {}
     try:
         rules_path = resource_path("yara_rules/themida.yara")
         rules = yara.compile(filepath=rules_path)
         for f in files:
+            matched = set()
             try:
                 matches = rules.match(f)
                 for m in matches:
                     protections.add(m.rule)
+                    matched.add(m.rule)
             except Exception:
                 continue
+            if matched:
+                prot_map[f] = list(matched)
     except Exception:
         protections.add("Erro ao carregar regras YARA")
-
-    # Busca heurística em nomes e strings
     for path in files:
         base = os.path.basename(path).lower()
-        # Ofuscação
+        found = set()
         for name, terms in OBFUSCATION_KEYWORDS:
             if any(term in base for term in terms):
                 protections.add(name)
-        # Anti-cheat
+                found.add(name)
         for name, terms in ANTI_CHEAT_KEYWORDS:
             if any(term in base for term in terms):
                 protections.add(name)
-        # Ferramentas extras
+                found.add(name)
         for name, terms in EXTRA_TOOLS:
             if any(term in base for term in terms):
                 protections.add(name)
-    return sorted(protections)
+                found.add(name)
+        if found:
+            prot_map.setdefault(path, [])
+            prot_map[path].extend(list(found))
+    return sorted(protections), prot_map

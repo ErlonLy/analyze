@@ -18,3 +18,7 @@ setuptools==80.9.0
 urllib3==2.5.0
 yara-python==4.5.4
 zstandard==0.23.0
+lief
+jinja2
+capstone
+

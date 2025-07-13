@@ -7,9 +7,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QIcon, QPixmap
 from core.engine import analyze_folder
+from core.html_report import export_html_report
 
 def resource_path(relative_path):
-    """Garante que PyInstaller encontra arquivos de dados"""
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
@@ -58,8 +58,16 @@ class MainWindow(QWidget):
         self.btn_export = QPushButton("Exportar resultado")
         self.btn_export.clicked.connect(self.export_result)
         self.btn_export.setEnabled(False)
+
+        self.btn_export_html = QPushButton("Exportar HTML")
+        self.btn_export_html.clicked.connect(self.export_html)
+        self.btn_export_html.setEnabled(False)
+        self.layout_main.addWidget(self.btn_export_html)
+
+
         self.layout_main.addWidget(self.btn_select)
         self.layout_main.addWidget(self.btn_export)
+        self.layout_main.addWidget(self.btn_export_html)
         self.layout_main.addWidget(self.result_area)
         self.tab_main.setLayout(self.layout_main)
 
@@ -67,7 +75,6 @@ class MainWindow(QWidget):
         self.tab_about = QWidget()
         self.layout_about = QVBoxLayout()
 
-        # Ícone no topo
         self.logo = QLabel()
         pixmap = QPixmap(resource_path("icon.ico"))
         if not pixmap.isNull():
@@ -91,7 +98,6 @@ class MainWindow(QWidget):
         self.layout_about.addStretch()
         self.tab_about.setLayout(self.layout_about)
 
-        # Tabs
         self.tabs.addTab(self.tab_main, "Análise")
         self.tabs.addTab(self.tab_about, "Sobre")
         layout = QVBoxLayout()
@@ -127,6 +133,7 @@ class MainWindow(QWidget):
             self.progress_bar.setValue(0)
             self.result_area.clear()
             self.btn_export.setEnabled(False)
+            self.btn_export_html.setEnabled(False)
             self.worker = AnalyzeWorker(folder)
             self.worker.progress_changed.connect(self.progress_bar.setValue)
             def on_finished(result):
@@ -134,6 +141,7 @@ class MainWindow(QWidget):
                 self.result_area.setHtml(self.pretty_result(result))
                 self.progress_bar.setVisible(False)
                 self.btn_export.setEnabled(True)
+                self.btn_export_html.setEnabled(True)
             self.worker.finished.connect(on_finished)
             self.worker.start()
 
@@ -153,6 +161,18 @@ class MainWindow(QWidget):
                 QMessageBox.information(self, "Sucesso", "Arquivo salvo com sucesso!")
             except Exception as e:
                 QMessageBox.warning(self, "Erro", f"Não foi possível salvar: {e}")
+
+    def export_html(self):
+        options = QFileDialog.Options()
+        file, _ = QFileDialog.getSaveFileName(self, "Salvar relatório HTML", "", "HTML (*.html)", options=options)
+        if file:
+            try:
+                from core.html_report import export_html_report
+                export_html_report(self.last_json, file)
+                QMessageBox.information(self, "Sucesso", "Relatório HTML salvo com sucesso!")
+            except Exception as e:
+                QMessageBox.warning(self, "Erro", f"Falha ao exportar HTML: {e}")
+
 
 def set_dark_theme(app):
     dark_qss = """

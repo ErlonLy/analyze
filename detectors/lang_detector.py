@@ -34,20 +34,21 @@ ENGINE_KEYWORDS = [
 def detect_languages(files):
     langs = set()
     engines = set()
+    lang_map = {}
+    engine_map = {}
     for path in files:
+        file_langs = set()
+        file_engines = set()
         base = os.path.basename(path).lower()
         ext = os.path.splitext(path)[1].lower()
-        # Linguagens via extensão/nomes
         for lang, terms in LANG_KEYWORDS:
-            for term in terms:
-                if term in base or term in ext:
-                    langs.add(lang)
-        # Motores via extensão/nomes
+            if any(term in base or term in ext for term in terms):
+                langs.add(lang)
+                file_langs.add(lang)
         for eng, terms in ENGINE_KEYWORDS:
-            for term in terms:
-                if term in base or term in ext:
-                    engines.add(eng)
-        # .exe/.dll: tenta PEfile
+            if any(term in base or term in ext for term in terms):
+                engines.add(eng)
+                file_engines.add(eng)
         if ext in [".exe", ".dll"]:
             try:
                 pe = pefile.PE(path)
@@ -57,14 +58,20 @@ def detect_languages(files):
                         for lang, terms in LANG_KEYWORDS:
                             if any(t in dll for t in terms):
                                 langs.add(lang)
+                                file_langs.add(lang)
                         for eng, terms in ENGINE_KEYWORDS:
                             if any(t in dll for t in terms):
                                 engines.add(eng)
-                # Heurística C++
+                                file_engines.add(eng)
                 section_names = [s.Name.strip(b"\x00") for s in pe.sections]
                 if b".rdata" in section_names or b".pdata" in section_names:
                     langs.add("c++")
+                    file_langs.add("c++")
             except Exception:
                 pass
+        if file_langs:
+            lang_map[path] = sorted(file_langs)
+        if file_engines:
+            engine_map[path] = sorted(file_engines)
     all_tags = list(sorted(langs | engines))
-    return all_tags
+    return list(sorted(langs)), lang_map, engine_map
