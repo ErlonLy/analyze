@@ -43,7 +43,7 @@ class MainWindow(QWidget):
         # --- Aba Sobre
         self.tab_about = QWidget()
         self.layout_about = QVBoxLayout()
-        self.lbl_author = QLabel("Autor: <b>Lyrien</b>")
+        self.lbl_author = QLabel(f"Autor: <b>Lyrien</b><br>Versão: <b>{get_local_version()}</b>")
         self.btn_update = QPushButton("Verificar atualização")
         self.lbl_update = QLabel("")
         self.btn_update.clicked.connect(self.check_update)
