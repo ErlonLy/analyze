@@ -1,16 +1,15 @@
 import sys
+import os
 import json
 import requests
 import threading
-import os
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QHBoxLayout, QTextEdit,
-    QMessageBox, QTabWidget, QLabel
+    QApplication, QWidget, QPushButton, QFileDialog, QVBoxLayout, QTextEdit, QMessageBox, QTabWidget, QLabel
 )
 from core.engine import analyze_folder
 from core.update import download_new_version, run_batch_update
 
-GITHUB_VERSION_URL = "https://raw.githubusercontent.com/ErlonLy/analyze/main/latest_version.json" # altere aqui!
+GITHUB_VERSION_URL = "https://raw.githubusercontent.com/ErlonLy/analyze/main/latest_version.json"  # Troque para o seu!
 
 def get_local_version():
     try:
@@ -25,6 +24,7 @@ class MainWindow(QWidget):
         self.setWindowTitle("GameAnalyzer")
         self.resize(800, 600)
         self.tabs = QTabWidget()
+
         # Aba Principal
         self.tab_main = QWidget()
         self.layout_main = QVBoxLayout()
@@ -39,6 +39,7 @@ class MainWindow(QWidget):
         self.layout_main.addWidget(self.btn_export)
         self.layout_main.addWidget(self.result_area)
         self.tab_main.setLayout(self.layout_main)
+
         # Aba Sobre
         self.tab_about = QWidget()
         self.layout_about = QVBoxLayout()
@@ -51,6 +52,7 @@ class MainWindow(QWidget):
         self.layout_about.addWidget(self.lbl_update)
         self.layout_about.addStretch()
         self.tab_about.setLayout(self.layout_about)
+
         # Tabs
         self.tabs.addTab(self.tab_main, "Análise")
         self.tabs.addTab(self.tab_about, "Sobre")
@@ -59,7 +61,41 @@ class MainWindow(QWidget):
         self.setLayout(layout)
         self.last_json = ""
 
-    # ... (métodos pretty_result, select_folder, export_result) ...
+    def pretty_result(self, result_json):
+        try:
+            result = json.loads(result_json)
+        except Exception:
+            return result_json
+        txt = f"Caminho do Jogo:\n{result['game_path']}\n\n"
+        txt += f"Executáveis/DLLs:\n" + "\n".join(str(x) for x in result["executables"]) + "\n\n"
+        txt += f"Linguagens/Engines Detectadas:\n" + ", ".join(str(x) for x in result["languages_detected"]) + "\n\n"
+        txt += f"Proteções e Ofuscação:\n" + ", ".join(str(x) for x in result["protections"]) + "\n\n"
+        txt += f"Criptografia (sinais):\n" + ", ".join(str(x) for x in result["crypto_signals"]) + "\n\n"
+        txt += f"Heurísticas Lua:\n" + ", ".join(str(x) for x in result["lua_heuristics"]) + "\n"
+        return txt
+
+    def select_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Selecione a pasta do jogo")
+        if folder:
+            result = analyze_folder(folder)
+            self.last_json = result
+            self.result_area.setPlainText(self.pretty_result(result))
+            self.btn_export.setEnabled(True)
+
+    def export_result(self):
+        options = QFileDialog.Options()
+        file, _ = QFileDialog.getSaveFileName(self, "Salvar resultado", "", "JSON (*.json);;TXT (*.txt)", options=options)
+        if file:
+            try:
+                if file.endswith(".json"):
+                    with open(file, "w", encoding="utf-8") as f:
+                        f.write(self.last_json)
+                else:
+                    with open(file, "w", encoding="utf-8") as f:
+                        f.write(self.result_area.toPlainText())
+                QMessageBox.information(self, "Sucesso", "Arquivo salvo com sucesso!")
+            except Exception as e:
+                QMessageBox.warning(self, "Erro", f"Não foi possível salvar: {e}")
 
     def check_update(self):
         self.lbl_update.setText("Verificando atualização...")
