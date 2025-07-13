@@ -5,20 +5,53 @@ import base64
 from io import BytesIO
 import json
 
+def top_n(data, labels, n=6):
+    # Retorna os top N, soma o resto como "outros"
+    pairs = sorted(zip(data, labels), reverse=True)
+    if len(pairs) <= n:
+        return list(data), list(labels)
+    top = pairs[:n]
+    others = sum([v for v, _ in pairs[n:]])
+    if others:
+        top.append((others, "outros"))
+    data, labels = zip(*top)
+    return list(data), list(labels)
+
 def plot_pie(data, labels, title="", colors=None):
     buf = BytesIO()
-    if not data or (len(data) == 1 and (labels[0].lower() == "nenhum" or data[0] == 0)):
-        # Retorna gráfico "vazio"
-        plt.figure(figsize=(2.7, 2.7))
-        plt.pie([1], labels=["Sem dados"], colors=["#444"], startangle=90)
+    total = sum(data)
+    if not data or (len(data) == 1 and (labels[0].lower() in ["nenhum", "sem dados", "sem engine detectada", "outros"] or data[0] == 0)):
+        plt.figure(figsize=(3.2, 3.2))
+        wedges, texts, autotexts = plt.pie(
+            [1], labels=["Sem dados"], colors=["#444"], startangle=90,
+            textprops=dict(color='white', fontsize=16, fontweight='bold')
+        )
         plt.tight_layout()
         plt.axis('equal')
         plt.savefig(buf, format='png', bbox_inches='tight', transparent=True)
         plt.close()
         buf.seek(0)
         return base64.b64encode(buf.getvalue()).decode()
-    plt.figure(figsize=(2.7, 2.7))
-    plt.pie(data, labels=labels, startangle=90, autopct='%1.0f%%', colors=colors)
+
+    plt.figure(figsize=(3.2, 3.2))
+    def my_labels(pct, allvals):
+        absolute = int(round(pct / 100. * total))
+        return f"{int(pct)}%" if pct >= 8 else ""
+    wedges, texts, autotexts = plt.pie(
+        data,
+        labels=labels,
+        startangle=90,
+        autopct=lambda pct: my_labels(pct, data),
+        colors=colors,
+        textprops=dict(color='white', fontsize=16, fontweight='bold')
+    )
+    for autotext in autotexts:
+        autotext.set_color('white')
+        autotext.set_fontsize(14)
+        autotext.set_fontweight('bold')
+    for txt in texts:
+        txt.set_fontsize(14)
+        txt.set_fontweight('bold')
     plt.tight_layout()
     plt.axis('equal')
     plt.savefig(buf, format='png', bbox_inches='tight', transparent=True)
@@ -26,40 +59,44 @@ def plot_pie(data, labels, title="", colors=None):
     buf.seek(0)
     return base64.b64encode(buf.getvalue()).decode()
 
-
 def export_html_report(result_json, file_path):
     result = json.loads(result_json)
     now = datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
-    # ==== RESUMO PARA GRÁFICOS ====
-    # Linguagens
+    # Contadores
     lang_counter = {}
     for langs in result.get('lang_map', {}).values():
         for l in langs:
             lang_counter[l] = lang_counter.get(l, 0) + 1
-    # Engines
     engine_counter = {}
     for engs in result.get('engine_map', {}).values():
         for e in engs:
             engine_counter[e] = engine_counter.get(e, 0) + 1
-    # Proteções
+    mid_counter = {}
+    for mids in result.get('middleware_map', {}).values():
+        for m in mids:
+            mid_counter[m] = mid_counter.get(m, 0) + 1
     prot_counter = {}
     for prots in result.get('prot_map', {}).values():
         for p in prots:
             prot_counter[p] = prot_counter.get(p, 0) + 1
-    # Criptografia
     crypto_counter = {}
     for crypts in result.get('crypto_map', {}).values():
         for c in crypts:
             crypto_counter[c] = crypto_counter.get(c, 0) + 1
 
-    # ==== GRÁFICOS BASE64 ====
-    pie_lang = plot_pie(list(lang_counter.values()), list(lang_counter.keys()), ["#f5b042","#90ee90","#5fcfff","#bb86fc"])
-    pie_engine = plot_pie(list(engine_counter.values()), list(engine_counter.keys()), ["#ffd700","#2196f3","#33dd99","#ccc"])
-    pie_prot = plot_pie(list(prot_counter.values()), list(prot_counter.keys()), ["#ff8c8c","#ff4c99","#c62828","#ffbdbd"])
-    pie_crypto = plot_pie(list(crypto_counter.values()), list(crypto_counter.keys()), ["#bb86fc","#fb8","#bdb","#6af","#f5b042"])
+    # Gráficos pizza: só top N + "outros"
+    lang_data, lang_labels = top_n(list(lang_counter.values()), list(lang_counter.keys()), 6)
+    pie_lang = plot_pie(lang_data, lang_labels, colors=["#f5b042","#90ee90","#5fcfff","#bb86fc","#f77","#f9c","#aaa"])
+    engine_data, engine_labels = top_n(list(engine_counter.values()), list(engine_counter.keys()), 6)
+    pie_engine = plot_pie(engine_data, engine_labels, colors=["#ffd700","#2196f3","#33dd99","#ccc","#888","#fff"])
+    mid_data, mid_labels = top_n(list(mid_counter.values()), list(mid_counter.keys()), 6)
+    pie_mid = plot_pie(mid_data, mid_labels, colors=["#ff4c99","#ffa","#1cc","#b9c","#fc0","#0cf","#888"])
+    prot_data, prot_labels = top_n(list(prot_counter.values()), list(prot_counter.keys()), 6)
+    pie_prot = plot_pie(prot_data, prot_labels, colors=["#ff8c8c","#c62828","#ffbdbd","#f99","#fcc","#ddd"])
+    crypto_data, crypto_labels = top_n(list(crypto_counter.values()), list(crypto_counter.keys()), 6)
+    pie_crypto = plot_pie(crypto_data, crypto_labels, colors=["#bb86fc","#fb8","#bdb","#6af","#f5b042","#888"])
 
-    # ==== HTML OUTPUT ====
     html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -99,6 +136,7 @@ def export_html_report(result_json, file_path):
         .p {{ color: #ff8c8c; font-weight: bold; }}
         .c {{ color: #bb86fc; font-weight: bold; }}
         .e {{ color: #5fcfff; font-weight: bold; }}
+        .m {{ color: #ff4c99; font-weight: bold; }}
         code {{
             font-family: 'Consolas', 'Courier New', monospace;
             background: #181a1b;
@@ -110,7 +148,7 @@ def export_html_report(result_json, file_path):
         .vlist {{ color: #90ee90; }}
         .details-table {{
             background: #232629; color: #fff;
-            width: 98%; margin: 0 auto; border-collapse: collapse; border-radius: 7px;
+            width: 99%; margin: 0 auto; border-collapse: collapse; border-radius: 7px;
             margin-bottom: 44px;
         }}
         .details-table th {{
@@ -127,25 +165,26 @@ def export_html_report(result_json, file_path):
             display: flex;
             flex-wrap: wrap;
             margin-bottom: 18px;
+            justify-content: left;
         }}
         .chartbox {{
-            flex: 1 1 180px;
-            margin: 0 12px;
+            min-width: 260px;
+            margin: 0 20px;
             text-align: center;
         }}
-        .chartbox img {{ background: #232629; border-radius: 14px; }}
+        .chartbox img {{ background: #232629; border-radius: 14px; width: 230px; height: 230px; }}
         .chartbox label {{
             display: block;
             color: #e0e0e0;
             margin-top: 6px;
-            font-size: 1.1em;
+            font-size: 1.22em;
             font-weight: bold;
         }}
         .warn {{ color: #ff7575; font-weight:bold; }}
         .footer {{
             color: #aaa; font-size: 0.98em; text-align: right; margin-top: 28px; margin-right: 32px;
         }}
-        @media (max-width: 850px) {{
+        @media (max-width: 1200px) {{
             .chartrow {{ flex-direction: column; align-items:center; }}
         }}
     </style>
@@ -161,8 +200,12 @@ def export_html_report(result_json, file_path):
     <hr>
     <h2 class="section">Resumo</h2>
     <div style="margin-left:13px;">
-        <span class="l"><b>Linguagens/Engines:</b></span>
-        <span class="vlist">{", ".join(result.get("languages_detected",[])+result.get("engines_detected",[])) or "-"}</span><br>
+        <span class="l"><b>Linguagens:</b></span>
+        <span class="vlist">{", ".join(result.get("languages_detected",[])) or "-"}</span><br>
+        <span class="e"><b>Engines:</b></span>
+        <span class="vlist">{", ".join(set(e for engs in result.get("engine_map",{}).values() for e in engs)) or "-"}</span><br>
+        <span class="m"><b>Middlewares:</b></span>
+        <span class="vlist">{", ".join(set(m for mids in result.get("middleware_map",{}).values() for m in mids)) or "-"}</span><br>
         <span class="p"><b>Proteções:</b></span> {", ".join(result.get("protections",[])) or "-"}<br>
         <span class="c"><b>Criptografia:</b></span> {", ".join(result.get("crypto_signals",[])) or "-"}<br>
         <span class="b" style="color:#ffd700;"><b>Heurísticas Lua:</b></span> {", ".join(str(x) for x in result.get("lua_heuristics",[])) or "-"}
@@ -171,16 +214,24 @@ def export_html_report(result_json, file_path):
     <h2 class="section">Resumo Visual</h2>
     <div class="chartrow">
         <div class="chartbox">
-            <img src="data:image/png;base64,{pie_lang}" width="180"><label>Linguagens</label>
+            <img src="data:image/png;base64,{pie_lang}" width="230" height="230"><label>Linguagens</label>
+            <div style="font-size:10.5pt;color:#ccc;">{"<br>".join([f"{k}: {lang_counter[k]}" for k in lang_counter])}</div>
         </div>
         <div class="chartbox">
-            <img src="data:image/png;base64,{pie_engine}" width="180"><label>Engines</label>
+            <img src="data:image/png;base64,{pie_engine}" width="230" height="230"><label>Engines</label>
+            <div style="font-size:10.5pt;color:#ccc;">{"<br>".join([f"{k}: {engine_counter[k]}" for k in engine_counter])}</div>
         </div>
         <div class="chartbox">
-            <img src="data:image/png;base64,{pie_prot}" width="180"><label>Proteções/Ofuscação</label>
+            <img src="data:image/png;base64,{pie_mid}" width="230" height="230"><label>Middlewares</label>
+            <div style="font-size:10.5pt;color:#ccc;">{"<br>".join([f"{k}: {mid_counter[k]}" for k in mid_counter])}</div>
         </div>
         <div class="chartbox">
-            <img src="data:image/png;base64,{pie_crypto}" width="180"><label>Criptografia</label>
+            <img src="data:image/png;base64,{pie_prot}" width="230" height="230"><label>Proteções</label>
+            <div style="font-size:10.5pt;color:#ccc;">{"<br>".join([f"{k}: {prot_counter[k]}" for k in prot_counter])}</div>
+        </div>
+        <div class="chartbox">
+            <img src="data:image/png;base64,{pie_crypto}" width="230" height="230"><label>Criptografia</label>
+            <div style="font-size:10.5pt;color:#ccc;">{"<br>".join([f"{k}: {crypto_counter[k]}" for k in crypto_counter])}</div>
         </div>
     </div>
 </div>
@@ -190,36 +241,45 @@ def export_html_report(result_json, file_path):
     <table class="details-table">
         <tr>
             <th>Arquivo</th>
+            <th>Tipo</th>
             <th>Linguagens</th>
             <th>Engine</th>
+            <th>Middlewares</th>
             <th>Proteções</th>
             <th>Criptografia</th>
+            <th>Entropia</th>
             <th>Heurística Lua</th>
         </tr>
 """
-    # === TABELA DETALHADA ===
     for f in result.get("executables",[]):
         html += "<tr>"
         html += f"<td><code>{os.path.basename(f)}</code></td>"
+        # Tipo (magic)
+        html += f"<td>{result.get('magic_map', {}).get(f, '-') or '-'}</td>"
         # Linguagem
         langs = result.get("lang_map", {}).get(f, [])
         html += f"<td>{', '.join(langs) if langs else '-'}</td>"
         # Engine
         engines = result.get("engine_map", {}).get(f, [])
         html += f"<td>{', '.join(engines) if engines else '-'}</td>"
+        # Middlewares
+        mids = result.get("middleware_map", {}).get(f, [])
+        html += f"<td>{', '.join(mids) if mids else '-'}</td>"
         # Proteções
         prots = result.get("prot_map", {}).get(f, [])
         html += f"<td>{', '.join(prots) if prots else '-'}</td>"
         # Criptografia
         crypts = result.get("crypto_map", {}).get(f, [])
         html += f"<td>{', '.join(crypts) if crypts else '-'}</td>"
-        # Heurística Lua
-        # (opcional: se desejar por heurística por arquivo, personalize aqui)
+        # Entropia
+        ent = result.get("entropy_map", {}).get(f, '-')
+        html += f"<td>{ent}</td>"
+        # Heurística Lua (a implementar por arquivo se quiser)
         html += "<td>-</td>"
         html += "</tr>"
     html += "</table>"
 
-    # === Agrupamentos ===
+    # Agrupamentos
     html += '<h2 class="section">Arquivos por Linguagem</h2>'
     lang_map = result.get("lang_map", {})
     if lang_map:
@@ -244,6 +304,14 @@ def export_html_report(result_json, file_path):
     else:
         html += '<span class="c">- Nenhum arquivo identificado por criptografia -</span><br>'
 
+    html += '<h2 class="section">Arquivos por Middleware</h2>'
+    mid_map = result.get("middleware_map", {})
+    if mid_map:
+        for path, mids in mid_map.items():
+            html += f"<b>{', '.join(mids)}:</b> <code>{os.path.basename(path)}</code><br>"
+    else:
+        html += '<span class="m">- Nenhum arquivo identificado por middleware -</span><br>'
+
     html += f"""
 <hr>
 <div class="footer">
@@ -254,6 +322,5 @@ Relatório gerado automaticamente pelo Loki Analyzer.
 </body></html>
 """
 
-    # Salva arquivo
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(html)

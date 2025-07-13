@@ -34,26 +34,24 @@ EXTRA_TOOLS = [
     ("arxan", ["arxan"]),
 ]
 
-def detect_protection(files):
+def detect_protection(files, progress_callback=None):
     protections = set()
     prot_map = {}
     try:
         rules_path = resource_path("yara_rules/themida.yara")
         rules = yara.compile(filepath=rules_path)
         for f in files:
-            matched = set()
             try:
                 matches = rules.match(f)
                 for m in matches:
                     protections.add(m.rule)
-                    matched.add(m.rule)
+                    prot_map.setdefault(f, []).append(m.rule)
             except Exception:
                 continue
-            if matched:
-                prot_map[f] = list(matched)
     except Exception:
         protections.add("Erro ao carregar regras YARA")
     for path in files:
+        print(f"Analisando arquivo: {path}")
         base = os.path.basename(path).lower()
         found = set()
         for name, terms in OBFUSCATION_KEYWORDS:
@@ -69,6 +67,9 @@ def detect_protection(files):
                 protections.add(name)
                 found.add(name)
         if found:
-            prot_map.setdefault(path, [])
-            prot_map[path].extend(list(found))
+            existing = set(prot_map.get(path, []))
+            prot_map[path] = list(existing | found)
+        if progress_callback:
+            progress_callback()
+            print(f"Arquivo processado: {path}")
     return sorted(protections), prot_map
