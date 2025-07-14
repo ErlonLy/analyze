@@ -8,6 +8,9 @@ from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QIcon, QPixmap
 from core.engine import analyze_folder
 from core.html_report import export_html_report
+from core.export_single_html import export_html_singlefile
+import json
+
 
 def resource_path(relative_path):
     if hasattr(sys, '_MEIPASS'):
@@ -164,12 +167,11 @@ class MainWindow(QWidget):
 
     def export_html(self):
         options = QFileDialog.Options()
-        file, _ = QFileDialog.getSaveFileName(self, "Salvar relatório HTML", "", "HTML (*.html)", options=options)
+        file, _ = QFileDialog.getSaveFileName(self, "Exportar HTML", "", "HTML Files (*.html)", options=options)
         if file:
             try:
-                from core.html_report import export_html_report
-                export_html_report(self.last_json, file)
-                QMessageBox.information(self, "Sucesso", "Relatório HTML salvo com sucesso!")
+                export_html_singlefile(json.loads(self.last_json), file)
+                QMessageBox.information(self, "Sucesso", f"Relatório HTML exportado: {file}")
             except Exception as e:
                 QMessageBox.warning(self, "Erro", f"Falha ao exportar HTML: {e}")
 

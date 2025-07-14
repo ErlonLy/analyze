@@ -65,4 +65,4 @@ Desenvolvida em **Python 3, PyQt5, Lupa (Lua), YARA** e arquitetura modular, ela
 **Comando exemplo:**
 
 ```bash
-pyinstaller --onefile --noconsole --icon=ico.ico --name "Loki Analyzer" --add-data "yara_rules;./yara_rules" --add-data "scripts;./scripts" --add-data "lupa;./lupa" --add-data "version.txt;." --add-data "ico.ico;." main.py
+pyinstaller --onefile --noconsole --icon=ico.ico --name "LokiAnalyzer" --add-data "src;./src" --add-data "yara_rules;./yara_rules" --add-data "version.txt;." --add-data "lupa;./lupa" main.py

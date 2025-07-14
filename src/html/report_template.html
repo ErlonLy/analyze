@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Loki Analyzer - Relatório Detalhado</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/src/css/style.css">
+</head>
+<body>
+  <div id="main-content">
+    <h1>Loki Analyzer - Relatório Detalhado</h1>
+    <div id="summary" class="summary-box"></div>
+    <div class="chart-row">
+      <div class="chartbox"><canvas id="pieLang"></canvas><div>Linguagens</div></div>
+      <div class="chartbox"><canvas id="pieEngine"></canvas><div>Engines</div></div>
+      <div class="chartbox"><canvas id="pieMid"></canvas><div>Middlewares</div></div>
+      <div class="chartbox"><canvas id="pieProt"></canvas><div>Proteções</div></div>
+      <div class="chartbox"><canvas id="pieCrypto"></canvas><div>Criptografia</div></div>
+    </div>
+    <div id="details"></div>
+    <div id="hashes"></div>
+    <footer>
+      <span>Loki Analyzer &copy; 2025 Lyrien</span>
+    </footer>
+  </div>
+  <script src="/src/js/chart.min.js"></script>
+  <script src="/src/js/anime.min.js"></script>
+  <script src="/src/js/loki_charts.js"></script>
+</body>
+</html>
