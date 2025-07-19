@@ -9,7 +9,9 @@ from PyQt5.QtGui import QIcon, QPixmap
 from core.engine import analyze_folder
 from core.html_report import export_html_report
 from core.export_single_html import export_html_singlefile
+from core import cpp_scanner
 import json
+
 
 
 def resource_path(relative_path):
@@ -102,7 +104,9 @@ class MainWindow(QWidget):
         self.tab_about.setLayout(self.layout_about)
 
         self.tabs.addTab(self.tab_main, "Análise")
+        self.tabs.addTab(self.create_advanced_tab(), "Avançado")
         self.tabs.addTab(self.tab_about, "Sobre")
+        
         layout = QVBoxLayout()
         layout.addWidget(self.tabs)
         self.setLayout(layout)
@@ -174,6 +178,31 @@ class MainWindow(QWidget):
                 QMessageBox.information(self, "Sucesso", f"Relatório HTML exportado: {file}")
             except Exception as e:
                 QMessageBox.warning(self, "Erro", f"Falha ao exportar HTML: {e}")
+    
+    def create_advanced_tab(self):
+        advanced_tab = QWidget()
+        layout = QVBoxLayout()
+        self.advanced_result = QTextEdit()
+        self.advanced_result.setReadOnly(True)
+        
+        btn_select_file = QPushButton("Selecionar arquivo para análise avançada")
+        btn_select_file.clicked.connect(self.run_advanced_scan)
+        
+        layout.addWidget(btn_select_file)
+        layout.addWidget(QLabel("Resultado:"))
+        layout.addWidget(self.advanced_result)
+        advanced_tab.setLayout(layout)
+        return advanced_tab
+    
+    def run_advanced_scan(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Selecione um arquivo", "", "Todos Arquivos (*)")
+        if not file_path:
+            return
+        try:
+            result = cpp_scanner.run_cpp_scanner(file_path)
+            self.advanced_result.setText(json.dumps(result, indent=4, ensure_ascii=False))
+        except Exception as e:
+            self.advanced_result.setText(f"Erro na análise avançada: {str(e)}")
 
 
 def set_dark_theme(app):
@@ -250,3 +279,5 @@ def start_gui():
     window.setWindowIcon(QIcon(resource_path("ico.ico")))
     window.show()
     sys.exit(app.exec_())
+
+
